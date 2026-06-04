@@ -1,4 +1,5 @@
 import csv
+import math
 import os
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -6,28 +7,7 @@ DATASET_DIR = os.path.join(BASE_DIR, "dataset")
 NORTH_DIR = os.path.join(DATASET_DIR, "north")
 SOUTH_DIR = os.path.join(DATASET_DIR, "south")
 
-MESES = {
-    1: "Jan", 2: "Fev", 3: "Mar", 4: "Abr",
-    5: "Mai", 6: "Jun", 7: "Jul", 8: "Ago",
-    9: "Set", 10: "Out", 11: "Nov", 12: "Dez",
-}
-
 ANO_MAX = 2025  # 2026 desconsiderado por ser ano incompleto
-
-# ── Parametros de nivel do mar (NOAA STAR altimetria, extraidos em mai/2025) ──
-# Fonte: slr_sla_gbl_keep_all_66.csv — NOAA Laboratory for Satellite Altimetry
-# Aceleracao calibrada aos cenarios medianos IPCC AR6 Tabela 9.10
-_SL = {
-    "ano_base":   2025,
-    "nivel_base": 82.4,    # mm na escala NOAA STAR (media 1993-2012 = 0)
-    "nivel_1993": -19.3,   # mm medio em 1993 na mesma escala
-    "taxa":        4.29,   # mm/ano — regressao dos ultimos 8 anos
-}
-_ACCEL = {
-    "Conservador  (SSP1-2.6)": 0.010,
-    "Intermediario (SSP2-4.5)": 0.042,
-    "Alto          (SSP5-8.5)": 0.148,
-}
 
 
 # ── Carregamento de dados ─────────────────────────────────────────────────────
@@ -137,46 +117,7 @@ def sobre_icetrack():
     pausar()
 
 
-# ── Opcao 2: Exibir dados por periodo ────────────────────────────────────────
-
-def exibir_dados_por_periodo():
-    titulo("EXTENSAO GLACIAL POR PERIODO")
-    regiao = pedir_regiao()
-    ano_ini = pedir_ano("Ano inicial", 1979, 2024)
-    ano_fim = pedir_ano("Ano final  ", ano_ini, ANO_MAX)
-
-    print(f"\n  Carregando {nome_regiao(regiao)}...")
-    dados = carregar_dados(regiao)
-    filtrados = [r for r in dados if ano_ini <= r["ano"] <= ano_fim]
-
-    if not filtrados:
-        print("  [!] Nenhum dado encontrado para o periodo informado.")
-        pausar()
-        return
-
-    medias_anuais = calcular_media_anual(filtrados)
-
-    print(f"\n  {'Ano':>6}  {'Mes':>4}  {'Extensao (M km2)':>18}  {'Area (M km2)':>14}")
-    linha()
-
-    ultimo_ano = None
-    for r in filtrados:
-        if r["ano"] != ultimo_ano:
-            if ultimo_ano is not None:
-                media = medias_anuais.get(ultimo_ano, 0.0)
-                print(f"  {'':>6}  {'':>4}  {'Media anual  ->':>18}  {media:>14.2f}")
-                linha("·")
-            ultimo_ano = r["ano"]
-        print(f"  {r['ano']:>6}  {MESES[r['mes']]:>4}  {r['extent']:>18.2f}  {r['area']:>14.2f}")
-
-    if ultimo_ano is not None:
-        media = medias_anuais.get(ultimo_ano, 0.0)
-        print(f"  {'':>6}  {'':>4}  {'Media anual  ->':>18}  {media:>14.2f}")
-
-    pausar()
-
-
-# ── Opcao 3: Variacao percentual entre dois anos ──────────────────────────────
+# ── Opcao 2: Variacao percentual entre dois anos ─────────────────────────────
 
 def calcular_variacao_percentual():
     titulo("VARIACAO PERCENTUAL ENTRE DOIS ANOS")
@@ -220,48 +161,7 @@ def calcular_variacao_percentual():
     pausar()
 
 
-# ── Opcao 4: Minima e maxima extensao ────────────────────────────────────────
-
-def identificar_extremos():
-    titulo("MINIMA E MAXIMA EXTENSAO REGISTRADA")
-    regiao = pedir_regiao()
-
-    dados = carregar_dados(regiao)
-
-    if not dados:
-        print("  [!] Sem dados disponiveis.")
-        pausar()
-        return
-
-    medias = calcular_media_anual(dados)
-    anos = sorted(medias.keys())
-
-    ano_min = min(medias, key=medias.get)
-    ano_max = max(medias, key=medias.get)
-    reg_min = min(dados, key=lambda x: x["extent"])
-    reg_max = max(dados, key=lambda x: x["extent"])
-
-    linha()
-    print(f"  Regiao  : {nome_regiao(regiao)}")
-    print(f"  Periodo : {anos[0]} - {anos[-1]}  ({len(dados)} registros mensais)")
-    linha()
-    print("  [ MEDIAS ANUAIS ]")
-    print(f"    Menor media anual : {ano_min}  ->  {medias[ano_min]:.2f} M km2")
-    print(f"    Maior media anual : {ano_max}  ->  {medias[ano_max]:.2f} M km2")
-    linha("·")
-    print("  [ REGISTROS MENSAIS (valor absoluto) ]")
-    print(f"    Menor extensao : {MESES[reg_min['mes']]}/{reg_min['ano']}  ->  {reg_min['extent']:.2f} M km2")
-    print(f"    Maior extensao : {MESES[reg_max['mes']]}/{reg_max['ano']}  ->  {reg_max['extent']:.2f} M km2")
-    linha()
-
-    if anos[0] in medias and anos[-1] in medias:
-        var = ((medias[anos[-1]] - medias[anos[0]]) / medias[anos[0]]) * 100
-        print(f"  Variacao total ({anos[0]} -> {anos[-1]}): {var:+.2f}%")
-
-    pausar()
-
-
-# ── Opcao 5: Relatorio de tendencia ──────────────────────────────────────────
+# ── Opcao 3: Relatorio de tendencia ──────────────────────────────────────────
 
 def gerar_relatorio_tendencia():
     titulo("GERAR RELATORIO DE TENDENCIA (.txt)")
@@ -358,7 +258,7 @@ def gerar_relatorio_tendencia():
     pausar()
 
 
-# ── Opcao 6: Projecao do nivel do oceano ─────────────────────────────────────
+# ── Regressao linear (auxiliar) ──────────────────────────────────────────────
 
 def _regressao_linear(xs: list, ys: list) -> tuple:
     """Retorna (taxa, intercepto) pela regressao linear de minimos quadrados."""
@@ -375,55 +275,236 @@ def _regressao_linear(xs: list, ys: list) -> tuple:
     return taxa, intercepto
 
 
-def projetar_nivel_oceano():
-    titulo("PROJECAO DO NIVEL DO OCEANO")
 
-    ano_base   = _SL["ano_base"]
-    nivel_base = _SL["nivel_base"]
-    nivel_1993 = _SL["nivel_1993"]
-    taxa       = _SL["taxa"]
+# ── Opcao 4: Comparar Artico vs Antartico ────────────────────────────────────
 
-    ano_alvo = pedir_ano("Ano alvo da projecao", ano_base + 1, 2100)
-    dt = ano_alvo - ano_base
+def comparar_regioes():
+    titulo("COMPARAR ARTICO VS ANTARTICO")
 
-    def projeto(accel: float) -> float:
-        return nivel_base + taxa * dt + 0.5 * accel * dt ** 2
+    print("  Carregando Artico (N)...")
+    dados_n = carregar_dados("N")
+    print("  Carregando Antartico (S)...")
+    dados_s = carregar_dados("S")
 
-    def ano_limiar(limiar_mm: float, accel: float) -> str:
-        alvo = nivel_1993 + limiar_mm
-        for delta_t in range(1, 300):
-            if nivel_base + taxa * delta_t + 0.5 * accel * delta_t ** 2 >= alvo:
-                return str(ano_base + delta_t)
-        return ">2200"
+    if not dados_n or not dados_s:
+        print("  [!] Dados insuficientes para comparacao.")
+        pausar()
+        return
+
+    medias_n = calcular_media_anual(dados_n)
+    medias_s = calcular_media_anual(dados_s)
+    anos_comuns = sorted(set(medias_n.keys()) & set(medias_s.keys()))
+
+    if not anos_comuns:
+        print("  [!] Sem anos em comum entre as regioes.")
+        pausar()
+        return
+
+    primeiro, ultimo = anos_comuns[0], anos_comuns[-1]
+
+    print(f"\n  {'Ano':>6}  {'Artico (M km2)':>16}  {'Antartico (M km2)':>18}  {'Dif. (N-S)':>12}")
+    linha()
+
+    for ano in anos_comuns:
+        n_val = medias_n[ano]
+        s_val = medias_s[ano]
+        dif   = n_val - s_val
+        print(f"  {ano:>6}  {n_val:>16.2f}  {s_val:>18.2f}  {dif:>+12.2f}")
 
     linha()
-    print(f"  Alta acumulada (1993-{ano_base}): {nivel_base - nivel_1993:.0f} mm  "
-          f"({(nivel_base - nivel_1993)/10:.1f} cm)")
-    print(f"  Taxa atual                  : {taxa:.2f} mm/ano")
+
+    var_n    = ((medias_n[ultimo] - medias_n[primeiro]) / medias_n[primeiro]) * 100
+    var_s    = ((medias_s[ultimo] - medias_s[primeiro]) / medias_s[primeiro]) * 100
+    media_n  = sum(medias_n[a] for a in anos_comuns) / len(anos_comuns)
+    media_s  = sum(medias_s[a] for a in anos_comuns) / len(anos_comuns)
+    min_n    = min(medias_n, key=medias_n.get)
+    min_s    = min(medias_s, key=medias_s.get)
+    max_n    = max(medias_n, key=medias_n.get)
+    max_s    = max(medias_s, key=medias_s.get)
+
+    print(f"  RESUMO COMPARATIVO  ({primeiro} - {ultimo})")
     linha()
-    print(f"  PROJECAO PARA {ano_alvo}  (+{dt} anos)")
+    print(f"  {'Indicador':<32}  {'Artico':>10}  {'Antartico':>11}")
+    linha("·")
+    print(f"  {'Variacao total':.<32}  {var_n:>+9.2f}%  {var_s:>+10.2f}%")
+    print(f"  {'Media do periodo (M km2)':.<32}  {media_n:>10.2f}  {media_s:>11.2f}")
+    print(f"  {'Menor extensao media: ano':.<32}  {min_n:>10}  {min_s:>11}")
+    print(f"  {'Menor extensao media: valor':.<32}  {medias_n[min_n]:>10.2f}  {medias_s[min_s]:>11.2f}")
+    print(f"  {'Maior extensao media: ano':.<32}  {max_n:>10}  {max_s:>11}")
+    print(f"  {'Maior extensao media: valor':.<32}  {medias_n[max_n]:>10.2f}  {medias_s[max_s]:>11.2f}")
     linha()
-    print(f"  {'Cenario':<30}  {'Alta c/ 1993 (cm)':>18}  {'Adicional (cm)':>16}")
-    print(f"  {'':─<30}  {'':─>18}  {'':─>16}")
-    for nome, accel in _ACCEL.items():
-        sl    = projeto(accel)
-        alta  = (sl - nivel_1993) / 10
-        delta = (sl - nivel_base) / 10
-        print(f"  {nome:<30}  {alta:>18.1f}  {delta:>+16.1f}")
-    linha()
-    print("  LIMIARES CRITICOS (ano estimado)")
-    linha()
-    nomes = list(_ACCEL.keys())
-    for limiar_mm, label in [(500, "+50 cm"), (1000, "+100 cm")]:
-        vals = [ano_limiar(limiar_mm, a) for a in _ACCEL.values()]
-        print(f"  {label} acima de 1993:  "
-              f"{nomes[0].split()[0]}={vals[0]}  "
-              f"{nomes[1].split()[0]}={vals[1]}  "
-              f"{nomes[2].split()[0]}={vals[2]}")
 
     pausar()
 
 
+# ── Opcao 5: Modelagem Matematica Exponencial (DPS) ───────────────────────────
+
+def modelagem_matematica():
+    titulo("MODELAGEM MATEMATICA EXPONENCIAL  [DPS]")
+
+    try:
+        import numpy as np
+        import matplotlib.pyplot as plt
+        tem_libs = True
+    except ImportError:
+        tem_libs = False
+
+    regiao = pedir_regiao()
+    print(f"\n  Carregando {nome_regiao(regiao)}...")
+    dados  = carregar_dados(regiao)
+    medias = calcular_media_anual(dados)
+    anos   = sorted(medias.keys())
+
+    if len(anos) < 5:
+        print("  [!] Dados insuficientes para modelagem.")
+        pausar()
+        return
+
+    ano_base = anos[0]
+    t_vals   = [float(a - ano_base) for a in anos]
+    a_vals   = [medias[a]           for a in anos]
+
+    # Fit exponencial: A(t) = A0 * e^(-k*t)
+    # Linearizacao: ln(A) = ln(A0) - k*t  →  regressao linear de (t, ln(A))
+    log_a      = [math.log(a) for a in a_vals]
+    slope, intercept = _regressao_linear(t_vals, log_a)
+    k          = -slope                # taxa positiva = decrescente
+    A0         = math.exp(intercept)   # extensao inicial estimada
+
+    T     = t_vals[-1]
+    dA_t0 = -k * A0                              # A'(0)
+    dA_tT = -k * A0 * math.exp(-k * T)          # A'(T)
+
+    # Meia-vida: A(t) = A0/2  =>  t = ln(2)/k
+    if k > 0:
+        t_half   = math.log(2) / k
+        ano_half = ano_base + t_half
+    else:
+        t_half = ano_half = None
+
+    # Integral acumulada no periodo: integral(0..T) de A(t)dt = A0/k*(1-e^(-kT))
+    area_acum = (A0 / k) * (1.0 - math.exp(-k * T)) if k != 0 else A0 * T
+
+    # Coeficiente nivel do mar: 0.073 mm por 1000 km2 = 73 mm por M km2
+    C_MM = 73.0
+
+    linha()
+    print("  MODELO PRINCIPAL: A(t) = A0 * e^(-k*t)")
+    print("  A(t) = extensao glacial no ano t  [M km2]")
+    print("  A0   = extensao inicial estimada  [M km2]")
+    print("  k    = taxa de degelo calibrada aos dados NSIDC  [1/ano]")
+    print(f"  t    = anos desde {ano_base}  (t=0 em {ano_base})")
+    linha()
+    print("  PARAMETROS AJUSTADOS (regressao log-linear sobre dados reais):")
+    print(f"    A0 = {A0:.4f} M km2")
+    print(f"    k  = {k:.6f} ao ano  ({'decrescente' if k > 0 else 'crescente'})")
+    linha()
+    print("  ANALISE MATEMATICA DA FUNCAO:")
+    print(f"    Dominio  :  t in [0, +inf)  =>  anos [{ano_base}, +inf)")
+    if k > 0:
+        print(f"    Imagem   :  (0, {A0:.2f}]  M km2")
+        print( "    Monotonia:  estritamente decrescente  |  A'(t) < 0 para todo t")
+        print( "    Concavidade: convexa (A''(t) = k^2*A0*e^(-kt) > 0)")
+    else:
+        print(f"    Imagem   :  [{A0:.2f}, +inf)  M km2")
+        print( "    Monotonia:  estritamente crescente  |  A'(t) > 0 para todo t")
+    linha()
+    print("  DERIVADA: A'(t) = -k * A0 * e^(-k*t)")
+    print(f"    A'(0)  = {dA_t0:+.4f} M km2/ano  (taxa em {ano_base})")
+    print(f"    A'({T:.0f}) = {dA_tT:+.4f} M km2/ano  (taxa em {anos[-1]})")
+    linha()
+    if t_half is not None:
+        print("  MEIA-VIDA GLACIAL:")
+        print(f"    A(t) = A0/2  quando  t = ln(2)/k = {t_half:.1f} anos")
+        print(f"    Estimativa: ano {ano_half:.0f}  (extensao cai para {A0/2:.2f} M km2)")
+        linha()
+    print(f"  INTEGRAL acumulada ({ano_base}-{anos[-1]}):")
+    print(f"    integral(0..{T:.0f}) A(t) dt = A0/k * (1 - e^(-k*T)) = {area_acum:.1f} M km2*ano")
+    linha()
+    print(f"  2a FUNCAO — IMPACTO NO NIVEL DO MAR: N(t) = C * (A0 - A(t))")
+    print(f"    C = {C_MM:.0f} mm por M km2 perdido  |  N(0) = 0 (referencia {ano_base})")
+    print(f"    {'Ano':>6}  {'A(t) (M km2)':>14}  {'Perda acum. (M km2)':>22}  {'N(t) (mm)':>12}")
+    linha("·")
+    for ano_alvo in [1979, 1990, 2000, 2010, 2020, 2025, 2050, 2075, 2100]:
+        if ano_alvo < ano_base:
+            continue
+        t_alvo = float(ano_alvo - ano_base)
+        at = A0 * math.exp(-k * t_alvo)
+        nt = C_MM * (A0 - at)
+        print(f"    {ano_alvo:>6}  {at:>14.3f}  {A0 - at:>22.3f}  {nt:>12.1f}")
+    linha()
+
+    if not tem_libs:
+        print("  [AVISO] matplotlib/numpy nao encontrados — graficos indisponiveis.")
+        print("          Instale com:  pip install matplotlib numpy")
+        pausar()
+        return
+
+    # ── Graficos com matplotlib ───────────────────────────────────────────────
+    import numpy as np
+    import matplotlib.pyplot as plt
+
+    t_mod    = np.linspace(0, 121, 500)
+    anos_mod = ano_base + t_mod
+    A_mod    = A0 * np.exp(-k * t_mod)
+    dA_mod   = -k * A0 * np.exp(-k * t_mod)
+    N_mod    = C_MM * (A0 - A_mod)
+
+    fig, axs = plt.subplots(3, 1, figsize=(12, 11), sharex=True)
+    fig.suptitle(
+        f"IceTrack — Modelagem Matematica Exponencial\n"
+        f"{nome_regiao(regiao)}  |  A(t) = {A0:.2f} * e^(-{k:.5f}*t)  |  {ano_base}–2100",
+        fontsize=12, fontweight="bold",
+    )
+
+    # Subplot 1: A(t) — modelo vs dados reais
+    ax1 = axs[0]
+    ax1.plot(anos_mod, A_mod, "b-", linewidth=2,
+             label=f"Modelo: A(t) = {A0:.2f}*e^(-{k:.5f}*t)")
+    ax1.scatter(anos, a_vals, color="navy", s=18, alpha=0.7,
+                label="Dados reais NSIDC", zorder=5)
+    ax1.axhline(y=A0 / 2, color="red", linestyle="--", alpha=0.7,
+                label=f"Meia-vida: {A0/2:.2f} M km²")
+    if t_half is not None:
+        ax1.axvline(x=ano_half, color="red", linestyle=":", alpha=0.6)
+        ax1.annotate(f"~{ano_half:.0f}", xy=(ano_half, A0 / 2),
+                     xytext=(ano_half + 3, A0 / 2 + 0.4), fontsize=9, color="red")
+    ax1.set_ylabel("Extensao (M km²)")
+    ax1.set_title("A(t) — Extensao Glacial Modelada vs Dados Reais")
+    ax1.legend(fontsize=9)
+    ax1.grid(True, alpha=0.3)
+
+    # Subplot 2: A'(t) — taxa instantanea
+    ax2 = axs[1]
+    ax2.plot(anos_mod, dA_mod, "g-", linewidth=2,
+             label="A'(t) = -k * A0 * e^(-k*t)")
+    ax2.axhline(y=0, color="black", linewidth=0.8)
+    ax2.fill_between(anos_mod, dA_mod, 0, alpha=0.2, color="green")
+    ax2.set_ylabel("Taxa (M km²/ano)")
+    ax2.set_title("A'(t) — Taxa Instantanea de Degelo (Derivada)")
+    ax2.legend(fontsize=9)
+    ax2.grid(True, alpha=0.3)
+
+    # Subplot 3: N(t) — impacto no nivel do mar
+    ax3 = axs[2]
+    ax3.plot(anos_mod, N_mod, "r-", linewidth=2,
+             label=f"N(t) = {C_MM:.0f} * (A0 - A(t))")
+    ax3.fill_between(anos_mod, N_mod, alpha=0.15, color="red")
+    ax3.set_ylabel("Elevacao estimada (mm)")
+    ax3.set_xlabel("Ano")
+    ax3.set_title("N(t) — Impacto Estimado no Nivel do Mar")
+    ax3.legend(fontsize=9)
+    ax3.grid(True, alpha=0.3)
+
+    plt.tight_layout()
+
+    nome_plot    = f"modelagem_dps_{regiao}_{ano_base}_{anos[-1]}.png"
+    caminho_plot = os.path.join(BASE_DIR, nome_plot)
+    plt.savefig(caminho_plot, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+
+    print(f"\n  Grafico salvo: {nome_plot}")
+    pausar()
 
 
 # ── Menu principal ────────────────────────────────────────────────────────────
@@ -434,11 +515,10 @@ def exibir_menu():
     print("  *** ICETRACK - Monitoramento de Geleiras via Dados Satelitais ***")
     linha("═")
     print("  [1]  Sobre o IceTrack")
-    print("  [2]  Exibir dados de extensao glacial por periodo")
-    print("  [3]  Calcular variacao percentual entre dois anos")
-    print("  [4]  Identificar minima e maxima extensao registrada")
-    print("  [5]  Gerar relatorio de tendencia (.txt)")
-    print("  [6]  Projetar nivel do oceano ate 2100")
+    print("  [2]  Calcular variacao percentual entre dois anos")
+    print("  [3]  Gerar relatorio de tendencia (.txt)")
+    print("  [4]  Comparar Artico vs Antartico")
+    print("  [5]  Modelagem matematica exponencial  [DPS]")
     print("  [0]  Sair")
     linha("─")
 
@@ -452,22 +532,20 @@ def main():
             case "1":
                 sobre_icetrack()
             case "2":
-                exibir_dados_por_periodo()
-            case "3":
                 calcular_variacao_percentual()
-            case "4":
-                identificar_extremos()
-            case "5":
+            case "3":
                 gerar_relatorio_tendencia()
-            case "6":
-                projetar_nivel_oceano()
+            case "4":
+                comparar_regioes()
+            case "5":
+                modelagem_matematica()
             case "0":
                 linha("═")
                 print("  Encerrando o IceTrack. Ate logo!")
                 linha("═")
                 break
             case _:
-                print("  [!] Opcao invalida. Escolha um numero entre 0 e 6.")
+                print("  [!] Opcao invalida. Escolha um numero entre 0 e 5.")
 
 
 if __name__ == "__main__":
